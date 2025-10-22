@@ -1,0 +1,49 @@
+# CMS Project Directories
+cms_admin_dashboard/
+cms_frontend_userSide/
+cms_testing_backend/
+
+# Node modules
+node_modules/
+
+# Python virtual environments
+venv/
+env/
+
+# Django
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.production
