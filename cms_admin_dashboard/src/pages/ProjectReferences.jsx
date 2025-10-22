@@ -11,6 +11,7 @@ const ProjectReferences = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [previewProject, setPreviewProject] = useState(null);
   const [editingProject, setEditingProject] = useState(null);
+  const [draggedProject, setDraggedProject] = useState(null);
   const [formData, setFormData] = useState({
     project_name: '',
     location: '',
@@ -20,7 +21,6 @@ const ProjectReferences = () => {
     layout_type: 1, // 1-4 for different layouts
     project_image: ['', '', '', ''], // Array of base64 images or empty strings
     is_favorite: false, // New favorite field
-    position: 1,
   });
 
   // Layout configurations
@@ -99,7 +99,6 @@ const ProjectReferences = () => {
         contractor: formData.contractor,
         layout_type: parseInt(formData.layout_type),
         project_image: filteredImages,
-        position: parseInt(formData.position) || 1,
       };
 
       console.log('Sending project data:', projectData);
@@ -154,7 +153,6 @@ const ProjectReferences = () => {
       layout_type: 1,
       project_image: ['', '', '', ''],
       is_favorite: false,
-      position: 1,
     });
     setEditingProject(null);
   };
@@ -179,7 +177,6 @@ const ProjectReferences = () => {
       layout_type: parseInt(project.layout_type) || 1,
       project_image: projectImages,
       is_favorite: project.is_favorite || false,
-      position: project.position || 1,
     });
     setShowModal(true);
     setError(null); // Clear any previous errors
@@ -255,6 +252,71 @@ const ProjectReferences = () => {
     const newImages = [...formData.project_image];
     newImages[index] = '';
     setFormData({ ...formData, project_image: newImages });
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e, project) => {
+    setDraggedProject(project);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedProject(null);
+  };
+
+  const handleDrop = async (e, targetProject) => {
+    e.preventDefault();
+    
+    if (!draggedProject || draggedProject.id === targetProject.id) {
+      return;
+    }
+
+    const draggedIndex = projects.findIndex(p => p.id === draggedProject.id);
+    const targetIndex = projects.findIndex(p => p.id === targetProject.id);
+    
+    if (draggedIndex === -1 || targetIndex === -1) {
+      return;
+    }
+
+    // Create new array with reordered projects
+    const newProjects = [...projects];
+    const [removed] = newProjects.splice(draggedIndex, 1);
+    newProjects.splice(targetIndex, 0, removed);
+
+    // Update positions
+    const updatedProjects = newProjects.map((project, index) => ({
+      ...project,
+      position: index + 1
+    }));
+
+    setProjects(updatedProjects);
+
+    // Save new positions to backend
+    try {
+      await Promise.all(
+        updatedProjects.map(project =>
+          adminApiService.projectReferences.update(project.id, {
+            project_name: project.project_name,
+            location: project.location,
+            site_area: project.site_area,
+            date_time: project.date_time,
+            contractor: project.contractor,
+            layout_type: project.layout_type,
+            project_image: project.project_image,
+            position: project.position,
+          })
+        )
+      );
+    } catch (err) {
+      setError('Failed to update project positions');
+      // Revert changes on error
+      fetchProjects();
+    }
   };
 
   const renderLayoutPreview = (layoutType, images) => {
@@ -396,7 +458,10 @@ const ProjectReferences = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-gray-900">Project References</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Project References</h1>
+          <p className="text-sm text-gray-600 mt-1">Drag and drop projects to reorder them</p>
+        </div>
         <button
           onClick={() => {
             setShowModal(true);
@@ -419,14 +484,29 @@ const ProjectReferences = () => {
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
-          <div key={project.id} className="bg-white rounded-lg shadow p-6">
+          <div 
+            key={project.id} 
+            className={`bg-white rounded-lg shadow p-6 cursor-move transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+              draggedProject?.id === project.id ? 'opacity-50 scale-95 shadow-2xl' : ''
+            }`}
+            draggable
+            onDragStart={(e) => handleDragStart(e, project)}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDrop={(e) => handleDrop(e, project)}
+          >
             {/* Layout Preview */}
             {renderLayoutPreview(project.layout_type || 1, project.project_image || [])}
             
             <div className="mt-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {project.project_name}
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {project.project_name}
+                </h3>
+                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  #{project.position}
+                </div>
+              </div>
               <div className="text-sm text-gray-600 space-y-1">
                 <p><span className="font-medium">Location:</span> {project.location}</p>
                 <p><span className="font-medium">Date:</span> {project.date_time}</p>
@@ -435,39 +515,44 @@ const ProjectReferences = () => {
               </div>
             </div>
             
-            <div className="flex space-x-2 mt-4">
-              <button
-                onClick={() => handleToggleFavorite(project)}
-                className={`${project.is_favorite ? 'text-red-600 hover:text-red-700' : 'text-gray-400 hover:text-red-600'} transition-colors`}
-                title={project.is_favorite ? "Remove from favorites" : "Add to favorites"}
-              >
-                {project.is_favorite ? (
-                  <HeartIconSolid className="w-5 h-5" />
-                ) : (
-                  <HeartIcon className="w-5 h-5" />
-                )}
-              </button>
-              <button
-                onClick={() => handlePreview(project)}
-                className="text-green-600 hover:text-green-900"
-                title="Preview"
-              >
-                <EyeIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleEdit(project)}
-                className="text-blue-600 hover:text-blue-900"
-                title="Edit"
-              >
-                <PencilIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleDelete(project.id)}
-                className="text-red-600 hover:text-red-900"
-                title="Delete"
-              >
-                <TrashIcon className="w-5 h-5" />
-              </button>
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-xs text-gray-500">
+                Drag to reorder
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleToggleFavorite(project)}
+                  className={`${project.is_favorite ? 'text-red-600 hover:text-red-700' : 'text-gray-400 hover:text-red-600'} transition-colors`}
+                  title={project.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                >
+                  {project.is_favorite ? (
+                    <HeartIconSolid className="w-5 h-5" />
+                  ) : (
+                    <HeartIcon className="w-5 h-5" />
+                  )}
+                </button>
+                <button
+                  onClick={() => handlePreview(project)}
+                  className="text-green-600 hover:text-green-900"
+                  title="Preview"
+                >
+                  <EyeIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handleEdit(project)}
+                  className="text-blue-600 hover:text-blue-900"
+                  title="Edit"
+                >
+                  <PencilIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(project.id)}
+                  className="text-red-600 hover:text-red-900"
+                  title="Delete"
+                >
+                  <TrashIcon className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -633,14 +718,9 @@ const ProjectReferences = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Display Position
                     </label>
-                    <input
-                      type="number"
-                      value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      placeholder="Enter position number (1, 2, 3...)"
-                      min="1"
-                    />
+                    <p className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                      {editingProject ? editingProject.position : (projects.length + 1)}
+                    </p>
                   </div>
                 </div>
 

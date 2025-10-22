@@ -8,15 +8,15 @@ const Products = () => {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [draggedProduct, setDraggedProduct] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     features: [''],
-    benefits: [''],
+    benefit: [''],
     performance: [''],
     images: [],
     comments: '',
-    position: 1,
   });
 
   // Helper function to count words
@@ -67,7 +67,7 @@ const Products = () => {
       setError(`Each performance item cannot exceed ${limits.feature} words`);
       return;
     }
-    if (formData.benefits.some(b => countWords(b) > limits.benefit)) {
+    if (formData.benefit.some(b => countWords(b) > limits.benefit)) {
       setError(`Each main application item cannot exceed ${limits.benefit} words`);
       return;
     }
@@ -78,7 +78,7 @@ const Products = () => {
     
     try {
       const featuresArray = formData.features.filter(f => f.trim());
-      const benefitsArray = formData.benefits.filter(b => b.trim());
+      const benefitArray = formData.benefit.filter(b => b.trim());
       const performanceArray = formData.performance.filter(p => p.trim());
       const imagesArray = formData.images.filter(i => i && i.trim());
 
@@ -86,11 +86,10 @@ const Products = () => {
         product_name: formData.title,
         product_description: formData.description,
         product_image: imagesArray,
-        success: featuresArray,
-        benefit: benefitsArray,
+        main_application: featuresArray,
+        benefit: benefitArray,
         performance: performanceArray,
         comments: formData.comments,
-        position: parseInt(formData.position) || 1,
       };
 
       if (editingProduct) {
@@ -99,7 +98,7 @@ const Products = () => {
         await adminApiService.products.create(productData);
       }
       setShowModal(false);
-      setFormData({ title: '', description: '', features: [''], benefits: [''], performance: [''], images: [], comments: '', position: 1 });
+      setFormData({ title: '', description: '', features: [''], benefit: [''], performance: [''], images: [], comments: '' });
       setEditingProduct(null);
       fetchProducts();
     } catch (err) {
@@ -113,12 +112,11 @@ const Products = () => {
     setFormData({
       title: product.product_name || '',
       description: product.product_description || '',
-      features: Array.isArray(product.success) && product.success.length ? product.success : [''],
-      benefits: Array.isArray(product.benefit) && product.benefit.length ? product.benefit : [''],
+      features: Array.isArray(product.main_application) && product.main_application.length ? product.main_application : [''],
+      benefit: Array.isArray(product.benefit) && product.benefit.length ? product.benefit : [''],
       performance: Array.isArray(product.performance) && product.performance.length ? product.performance : [''],
       images: Array.isArray(product.product_image) ? product.product_image : [],
       comments: product.comments || '',
-      position: product.position || 1,
     });
     setShowModal(true);
   };
@@ -159,6 +157,71 @@ const Products = () => {
     }));
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e, product) => {
+    setDraggedProduct(product);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedProduct(null);
+  };
+
+  const handleDrop = async (e, targetProduct) => {
+    e.preventDefault();
+    
+    if (!draggedProduct || draggedProduct.id === targetProduct.id) {
+      return;
+    }
+
+    const draggedIndex = products.findIndex(p => p.id === draggedProduct.id);
+    const targetIndex = products.findIndex(p => p.id === targetProduct.id);
+    
+    if (draggedIndex === -1 || targetIndex === -1) {
+      return;
+    }
+
+    // Create new array with reordered products
+    const newProducts = [...products];
+    const [removed] = newProducts.splice(draggedIndex, 1);
+    newProducts.splice(targetIndex, 0, removed);
+
+    // Update positions
+    const updatedProducts = newProducts.map((product, index) => ({
+      ...product,
+      position: index + 1
+    }));
+
+    setProducts(updatedProducts);
+
+    // Save new positions to backend
+    try {
+      await Promise.all(
+        updatedProducts.map(product =>
+          adminApiService.products.update(product.id, {
+            product_name: product.product_name,
+            product_description: product.product_description,
+            product_image: product.product_image,
+            main_application: product.main_application,
+            benefit: product.benefit,
+            performance: product.performance,
+            comments: product.comments,
+            position: product.position,
+          })
+        )
+      );
+    } catch (err) {
+      setError('Failed to update product positions');
+      // Revert changes on error
+      fetchProducts();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -171,7 +234,10 @@ const Products = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-gray-900">Products</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Products</h1>
+          <p className="text-sm text-gray-600 mt-1">Drag and drop products to reorder them</p>
+        </div>
         <button
           onClick={() => setShowModal(true)}
           className="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 flex items-center space-x-2"
@@ -191,7 +257,17 @@ const Products = () => {
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {products.map((product) => (
-          <div key={product.id} className="bg-white rounded-lg shadow p-6">
+          <div 
+            key={product.id} 
+            className={`bg-white rounded-lg shadow p-6 cursor-move transition-all duration-200 hover:shadow-lg hover:scale-105 ${
+              draggedProduct?.id === product.id ? 'opacity-50 scale-95 shadow-2xl' : ''
+            }`}
+            draggable
+            onDragStart={(e) => handleDragStart(e, product)}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDrop={(e) => handleDrop(e, product)}
+          >
             {product.product_image && product.product_image.length > 0 && (
               <img
                 src={product.product_image[0]}
@@ -199,28 +275,37 @@ const Products = () => {
                 className="w-full h-32 object-cover rounded-lg mb-4"
               />
             )}
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {product.product_name}
-            </h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {product.product_name}
+              </h3>
+              <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                #{product.position}
+              </div>
+            </div>
             <p className="text-gray-600 text-sm mb-4 line-clamp-3">
               {product.product_description}
             </p>
-            <div className="text-xs text-gray-500 mb-3">
-              Position: {product.position || 'Not set'}
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => handleEdit(product)}
-                className="text-blue-600 hover:text-blue-900"
-              >
-                <PencilIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleDelete(product.id)}
-                className="text-red-600 hover:text-red-900"
-              >
-                <TrashIcon className="w-5 h-5" />
-              </button>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-gray-500">
+                Drag to reorder
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleEdit(product)}
+                  className="text-blue-600 hover:text-blue-900 p-1"
+                  title="Edit product"
+                >
+                  <PencilIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(product.id)}
+                  className="text-red-600 hover:text-red-900 p-1"
+                  title="Delete product"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -247,6 +332,12 @@ const Products = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
+                <p className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                  {editingProduct ? editingProduct.position : (products.length + 1)}
+                </p>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Description <span className="text-xs text-gray-500">({countWords(formData.description)}/{limits.description} words)</span>
                 </label>
@@ -257,21 +348,6 @@ const Products = () => {
                   rows="3"
                   required
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Display Position
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  placeholder="Enter position number (1, 2, 3...)"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">Lower numbers appear first in the display order</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Performance</label>
@@ -305,29 +381,29 @@ const Products = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Main Applications</label>
-                {formData.benefits.map((benefit, idx) => (
+                {formData.benefit.map((benefit, idx) => (
                   <div key={idx} className="flex items-center mb-2">
                     <div className="flex-1">
                       <input
                         type="text"
                         value={benefit}
                         onChange={e => {
-                          const updated = [...formData.benefits];
+                          const updated = [...formData.benefit];
                           updated[idx] = e.target.value;
-                          setFormData({ ...formData, benefits: updated });
+                          setFormData({ ...formData, benefit: updated });
                         }}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                       <span className="text-xs text-gray-500 ml-1">({countWords(benefit)}/{limits.benefit} words)</span>
                     </div>
-                    {formData.benefits.length > 1 && (
+                    {formData.benefit.length > 1 && (
                       <button type="button" className="ml-2 text-red-500" onClick={() => {
-                        setFormData({ ...formData, benefits: formData.benefits.filter((_, i) => i !== idx) });
+                        setFormData({ ...formData, benefit: formData.benefit.filter((_, i) => i !== idx) });
                       }}>-</button>
                     )}
-                    {idx === formData.benefits.length - 1 && formData.benefits.length < 3 && (
+                    {idx === formData.benefit.length - 1 && formData.benefit.length < 3 && (
                       <button type="button" className="ml-2 text-green-500" onClick={() => {
-                        setFormData({ ...formData, benefits: [...formData.benefits, ''] });
+                        setFormData({ ...formData, benefit: [...formData.benefit, ''] });
                       }}>+</button>
                     )}
                   </div>
@@ -407,7 +483,7 @@ const Products = () => {
                   onClick={() => {
                     setShowModal(false);
                     setEditingProduct(null);
-                    setFormData({ title: '', description: '', features: [''], benefits: [''], performance: [''], images: [], comments: '', position: 1 });
+                    setFormData({ title: '', description: '', features: [''], benefit: [''], performance: [''], images: [], comments: '' });
                   }}
                   className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
                 >
