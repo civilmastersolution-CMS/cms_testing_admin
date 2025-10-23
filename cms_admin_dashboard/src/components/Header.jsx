@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { UserIcon } from '@heroicons/react/24/outline';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -36,11 +36,6 @@ const Header = () => {
               <p className="text-xs text-gray-500">Administrator</p>
             </div>
           </div>
-
-          {/* Settings */}
-          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <Cog6ToothIcon className="w-5 h-5" />
-          </button>
 
           {/* Logout */}
           <button

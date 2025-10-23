@@ -103,6 +103,13 @@ export const adminApiService = {
     create: (data) => api.post('/admin/articles/', data),
     update: (id, data) => api.put(`/admin/articles/${id}/`, data),
     delete: (id) => api.delete(`/admin/articles/${id}/`),
+    uploadArticle: (formData) => {
+      return api.post('/admin/articles/upload_article/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    },
   },
 };
 

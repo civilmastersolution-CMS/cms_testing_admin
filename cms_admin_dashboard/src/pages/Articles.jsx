@@ -1,13 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminApiService } from '../services/api';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 const Articles = () => {
   const navigate = useNavigate();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewArticle, setPreviewArticle] = useState(null);
+
+  // Get media base URL
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const mediaBase = apiBase.replace('/api', '');
+
+  // Helper function to extract plain text preview from content
+  const getContentPreview = (articleItem) => {
+    // Check for HTML content first
+    if (articleItem.content_html) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = articleItem.content_html;
+      const text = tmp.textContent || tmp.innerText || '';
+      return text.slice(0, 100) + (text.length > 100 ? '...' : '');
+    }
+    
+    // Fallback to Slate JSON content
+    if (articleItem.content && articleItem.content.content && Array.isArray(articleItem.content.content)) {
+      const text = articleItem.content.content.map(node => 
+        node.children?.map(child => child.text).join('') || ''
+      ).join(' ');
+      return text.slice(0, 100) + (text.length > 100 ? '...' : '');
+    }
+    
+    return 'No content available';
+  };
 
   useEffect(() => {
     fetchArticles();
@@ -36,6 +63,11 @@ const Articles = () => {
     }
   };
 
+  const handlePreview = (article) => {
+    setPreviewArticle(article);
+    setShowPreviewModal(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -49,13 +81,15 @@ const Articles = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-gray-900">Articles</h1>
-        <button
-          onClick={() => navigate('/articles/edit/new')}
-          className="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 flex items-center space-x-2"
-        >
-          <PlusIcon className="w-5 h-5" />
-          <span>Add Article</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => navigate('/articles/upload')}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
+          >
+            <PlusIcon className="w-5 h-5" />
+            <span>Add Article</span>
+          </button>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -96,14 +130,7 @@ const Articles = () => {
                       {articleItem.article_title}
                     </div>
                     <div className="text-sm text-gray-500 truncate max-w-xs">
-                      {articleItem.content && articleItem.content.content && Array.isArray(articleItem.content.content) 
-                        ? articleItem.content.content.map(node => 
-                            node.children?.map(child => child.text).join('') || ''
-                          ).join(' ').slice(0, 100) + (articleItem.content.content.map(node => 
-                            node.children?.map(child => child.text).join('') || ''
-                          ).join(' ').length > 100 ? '...' : '')
-                        : 'No content available'
-                      }
+                      {getContentPreview(articleItem)}
                     </div>
                   </div>
                 </td>
@@ -136,11 +163,11 @@ const Articles = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                   <button
-                    onClick={() => navigate(`/articles/edit/${articleItem.id}`)}
+                    onClick={() => handlePreview(articleItem)}
                     className="text-blue-600 hover:text-blue-900"
-                    title="Edit"
+                    title="Preview"
                   >
-                    <PencilIcon className="w-5 h-5" />
+                    <EyeIcon className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => handleDelete(articleItem.id)}
@@ -155,6 +182,34 @@ const Articles = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Preview Modal */}
+      {showPreviewModal && previewArticle && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold">Article Preview: {previewArticle.article_title}</h3>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <div className="mb-4">
+                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  {previewArticle.category || 'Uncategorized'}
+                </span>
+              </div>
+              <div 
+                dangerouslySetInnerHTML={{ __html: previewArticle.content_html }}
+                className="prose max-w-none"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

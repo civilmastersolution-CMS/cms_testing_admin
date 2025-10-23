@@ -10,6 +10,7 @@ import ProjectReferences from './ProjectReferences';
 import News from './News';
 import Articles from './Articles';
 import ArticleEditor from './ArticleEditor';
+import ArticleUpload from './ArticleUpload';
 
 const Dashboard = () => {
   return (
@@ -34,6 +35,7 @@ const Dashboard = () => {
             <Route path="/news" element={<News />} />
             <Route path="/articles" element={<Articles />} />
             <Route path="/articles/edit/:id" element={<ArticleEditor />} />
+            <Route path="/articles/upload" element={<ArticleUpload />} />
           </Routes>
         </main>
       </div>
