@@ -145,7 +145,7 @@ const Articles = () => {
                       {articleItem.article_image.slice(0, 3).map((image, index) => (
                         <img
                           key={index}
-                          src={image}
+                          src={typeof image === 'string' ? image : image.data_url}
                           alt={`Article ${index + 1}`}
                           className="w-10 h-10 object-cover rounded border"
                         />
