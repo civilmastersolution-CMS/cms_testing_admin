@@ -265,19 +265,14 @@ const ArticleUpload = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Category
             </label>
-            <select
+            <input
+              type="text"
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter category (e.g., Technical, Industry News, Case Studies)"
               required
-            >
-              <option value="">Select a category</option>
-              <option value="Technical">Technical</option>
-              <option value="Industry News">Industry News</option>
-              <option value="Case Studies">Case Studies</option>
-              <option value="Guides">Guides</option>
-              <option value="Other">Other</option>
-            </select>
+            />
           </div>
 
           {/* Keywords */}

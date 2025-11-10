@@ -14,6 +14,7 @@ const News = () => {
     keyword: [],
     news_image: [],
   });
+  const [keywordInput, setKeywordInput] = useState('');
 
   useEffect(() => {
     fetchNews();
@@ -82,6 +83,7 @@ const News = () => {
       keyword: newsItem.keyword || [],
       news_image: newsItem.news_image || [],
     });
+    setKeywordInput('');
     setShowModal(true);
   };
 
@@ -262,14 +264,18 @@ const News = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Title <span className="text-xs text-gray-500">({formData.news_title.length}/25)</span>
+                  Title <span className="text-xs text-gray-500">({formData.news_title.trim().split(/\s+/).filter(word => word.length > 0).length}/10 words)</span>
                 </label>
                 <input
                   type="text"
                   value={formData.news_title}
-                  onChange={(e) => setFormData({ ...formData, news_title: e.target.value })}
+                  onChange={(e) => {
+                    const words = e.target.value.trim().split(/\s+/).filter(word => word.length > 0);
+                    if (words.length <= 10) {
+                      setFormData({ ...formData, news_title: e.target.value });
+                    }
+                  }}
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  maxLength="25"
                   required
                 />
               </div>
@@ -296,16 +302,52 @@ const News = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Keywords <span className="text-xs text-gray-500">({formData.keyword.join(', ').length}/20)</span>
+                  Keywords <span className="text-xs text-gray-500">({formData.keyword.length}/10 words)</span>
                 </label>
                 <input
                   type="text"
-                  value={formData.keyword.join(', ')}
-                  onChange={(e) => setFormData({ ...formData, keyword: e.target.value.split(',').map(k => k.trim()) })}
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      const newKeyword = keywordInput.trim();
+                      if (newKeyword && formData.keyword.length < 10) {
+                        setFormData({
+                          ...formData,
+                          keyword: [...formData.keyword, newKeyword]
+                        });
+                        setKeywordInput('');
+                      }
+                    }
+                  }}
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  maxLength="20"
-                  placeholder="e.g., Technology, Engineering"
+                  placeholder="Type and press Enter or comma to add keyword"
                 />
+                {formData.keyword.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {formData.keyword.map((kw, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                      >
+                        {kw}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              keyword: formData.keyword.filter((_, i) => i !== index)
+                            });
+                          }}
+                          className="ml-1 text-blue-600 hover:text-blue-900"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
