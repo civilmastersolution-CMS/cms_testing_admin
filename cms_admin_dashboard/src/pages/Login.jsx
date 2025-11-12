@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FaUser, FaLock, FaEye, FaEyeSlash, FaBuilding } from 'react-icons/fa';
+import { FaUser, FaLock, FaEye, FaEyeSlash, FaBuilding, FaWifi } from 'react-icons/fa';
 
 const Login = () => {
   const { login, loading, error } = useAuth();
@@ -22,6 +22,23 @@ const Login = () => {
     await login(formData.username, formData.password);
   };
 
+  const testBackendConnection = async () => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const testUrl = apiUrl.replace('/api', '') + '/articles/';
+      
+      const response = await fetch(testUrl);
+      const data = await response.json();
+      
+      alert(`✅ Backend Connected Successfully!\n\nURL: ${testUrl}\nStatus: ${response.status}\nArticles found: ${data.length || 0}`);
+    } catch (error) {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const testUrl = apiUrl.replace('/api', '') + '/articles/';
+      
+      alert(`❌ Backend Connection Failed!\n\nURL: ${testUrl}\nError: ${error.message}\n\nPlease check:\n1. Backend server is running\n2. VITE_API_URL is correct\n3. Network connection`);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cyan-600 to-blue-700">
       <div className="max-w-md w-full mx-4">
@@ -39,6 +56,17 @@ const Login = () => {
             <p className="text-gray-600">
               Civil Master Solution CMS
             </p>
+          </div>
+
+          {/* API Test Button */}
+          <div className="mb-6">
+            <button
+              onClick={testBackendConnection}
+              className="w-full flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200"
+            >
+              <FaWifi className="text-sm" />
+              <span>Test API Connection</span>
+            </button>
           </div>
 
           {/* Error Message */}
